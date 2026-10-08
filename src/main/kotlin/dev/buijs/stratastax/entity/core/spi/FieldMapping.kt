@@ -18,12 +18,18 @@ package dev.buijs.stratastax.entity.core.spi
 
 /** Maps field names, as used in search requests, to their [F] definition. */
 interface FieldMapping<out F : Any> {
+
     val fields: Map<String, F>
 
-    /** Returns the field registered under [name]. */
+    /**
+     * Returns the field registered under [name].
+     *
+     * @throws UnknownFieldException If no field is registered under [name].
+     */
     fun field(name: String): F = fields[name] ?: throw UnknownFieldException(name)
 }
 
 /** Thrown when a [FieldMapping] has no field registered for the requested name. */
-class UnknownFieldException(name: String) :
-    IllegalStateException("No mapping found for search field ($name)")
+class UnknownFieldException(
+    name: String,
+) : IllegalStateException("No mapping found for search field ($name)")

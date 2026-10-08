@@ -45,6 +45,22 @@ class PatchFieldTest {
     }
 
     @Test
+    fun `nullAs replaces only an explicit null`() {
+        // given
+        val unset: PatchField<List<String>> = PatchField.Unset
+
+        // expect
+        assertThat(unset.nullAs(emptyList()))
+            .isEqualTo(PatchField.Unset)
+
+        assertThat(PatchField.Value<List<String>>(null).nullAs(emptyList()))
+            .isEqualTo(PatchField.Value(emptyList<String>()))
+
+        assertThat(PatchField.Value(listOf("a")).nullAs(emptyList()))
+            .isEqualTo(PatchField.Value(listOf("a")))
+    }
+
+    @Test
     fun `orKeepRequired on Unset returns current`() {
         assertThat(PatchField.Unset.orKeepRequired("current", "name")).isEqualTo("current")
     }
@@ -56,10 +72,13 @@ class PatchFieldTest {
 
     @Test
     fun `orKeepRequired on Value(null) throws`() {
+        // given
         val error =
             catchThrowableOfType(IllegalArgumentException::class.java) {
                 PatchField.Value<String>(null).orKeepRequired("current", "name")
             }
+
+        // expect
         assertThat(error.message).contains("name")
     }
 
@@ -82,14 +101,11 @@ class PatchFieldTest {
             .isEqualTo(emptySet<Any?>())
     }
 
-    private data class Wrapper(val value: String)
-
     @Test
     fun `toTargetIdsOrNull with a transform unwraps each element`() {
         assertThat(
-                PatchField.Value(listOf(Wrapper("a"), Wrapper("b"))).toTargetIdsOrNull { it.value }
-            )
-            .isEqualTo(setOf("a", "b"))
+            PatchField.Value(listOf(Wrapper("a"), Wrapper("b"))).toTargetIdsOrNull { it.value },
+        ).isEqualTo(setOf("a", "b"))
     }
 
     @Test
@@ -99,7 +115,10 @@ class PatchFieldTest {
 
     @Test
     fun `toTargetIdsOrNull also resolves when the receiver's own collection type argument is declared nullable`() {
+        // given
         val nullable: PatchField<List<String>?> = PatchField.Value(listOf("a", "b"))
+
+        // expect
         assertThat(nullable.toTargetIdsOrNull()).isEqualTo(setOf("a", "b"))
         assertThat(PatchField.Unset.toTargetIdsOrNull<String>()).isNull()
     }
@@ -111,21 +130,30 @@ class PatchFieldTest {
 
     @Test
     fun `orNullIfUnset on Value returns the collection unchanged`() {
-        assertThat(PatchField.Value(listOf("a", "b")).orNullIfUnset()).isEqualTo(listOf("a", "b"))
+        assertThat(PatchField.Value(listOf("a", "b")).orNullIfUnset())
+            .isEqualTo(listOf("a", "b"))
     }
 
     @Test
     fun `orNullIfUnset on Value(null) or Value(emptyList) both return an empty collection`() {
         assertThat(PatchField.Value<List<String>>(null).orNullIfUnset())
             .isEqualTo(emptyList<String>())
+
         assertThat(PatchField.Value(emptyList<String>()).orNullIfUnset())
             .isEqualTo(emptyList<String>())
     }
 
     @Test
     fun `orNullIfUnset also resolves when the receiver's own collection type argument is declared nullable`() {
+        // given
         val nullable: PatchField<List<String>?> = PatchField.Value(listOf("a", "b"))
+
+        // expect
         assertThat(nullable.orNullIfUnset()).isEqualTo(listOf("a", "b"))
         assertThat(PatchField.Unset.orNullIfUnset<String>()).isNull()
     }
+
+    private data class Wrapper(
+        val value: String,
+    )
 }

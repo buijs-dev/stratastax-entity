@@ -26,6 +26,7 @@ class TypeGeneratorTest {
         // given
         val generator =
             object : TypeGenerator<Long>("ownerId") {
+
                 override fun generate(): Long = 7L
             }
 
@@ -38,10 +39,26 @@ class TypeGeneratorTest {
         // given
         val generator =
             object : TypeGenerator<String>() {
+
                 override fun generate(): String = "x"
             }
 
         // expect
         assertThat(generator.generate()).isEqualTo("x")
+    }
+
+    @Test
+    fun `generate is called for every value`() {
+        // given
+        var counter = 0
+        val generator =
+            object : TypeGenerator<Int>() {
+
+                override fun generate(): Int = ++counter
+            }
+
+        // expect
+        assertThat(generator.generate()).isEqualTo(1)
+        assertThat(generator.generate()).isEqualTo(2)
     }
 }
