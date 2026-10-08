@@ -28,6 +28,7 @@ class FieldMappingTest {
 
     private val mapping =
         object : FieldMapping<EntityField> {
+
             override val fields = mapOf("title" to title)
         }
 

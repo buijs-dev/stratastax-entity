@@ -24,11 +24,14 @@ package dev.buijs.stratastax.entity.core.api
  * explicitly cleared. Has no persistence dependencies, so it can also be used by an HTTP layer.
  */
 sealed interface PatchField<out T> {
+
     /** The field was not supplied. */
     data object Unset : PatchField<Nothing>
 
     /** The field was supplied, [value] may be `null`. */
-    data class Value<T>(val value: T?) : PatchField<T>
+    data class Value<T>(
+        val value: T?,
+    ) : PatchField<T>
 
     /** True for [Value], false for [Unset]. */
     val isProvided: Boolean
@@ -47,11 +50,37 @@ fun <T> PatchField<T>.orKeep(current: T?): T? =
  *
  * @throws IllegalArgumentException if this is `Value(null)`; [fieldName] is used in the message.
  */
-fun <T> PatchField<T>.orKeepRequired(current: T, fieldName: String): T =
+fun <T> PatchField<T>.orKeepRequired(
+    current: T,
+    fieldName: String,
+): T =
     when (this) {
-        PatchField.Unset -> current
-        is PatchField.Value ->
+        PatchField.Unset -> {
+            current
+        }
+        is PatchField.Value -> {
             value ?: throw IllegalArgumentException("'$fieldName' must not be null")
+        }
+    }
+
+/**
+ * Returns [Value] of [replacement] for `Value(null)`, otherwise this field unchanged.
+ *
+ * For a property that is never `null`, such as a collection, an explicit `null` then means
+ * [replacement] (e.g. an empty list), while [Unset] still leaves the property untouched.
+ */
+fun <T> PatchField<T>.nullAs(replacement: T): PatchField<T> =
+    when (this) {
+        PatchField.Unset -> {
+            this
+        }
+        is PatchField.Value -> {
+            if (value == null) {
+                PatchField.Value(replacement)
+            } else {
+                this
+            }
+        }
     }
 
 /**
