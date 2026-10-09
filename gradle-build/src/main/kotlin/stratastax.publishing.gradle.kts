@@ -44,3 +44,27 @@ publishing {
         }
     }
 }
+
+// Release versions go to GitHub Packages, snapshots to Repsy. Credentials come from the
+// environment set by the buijs-dev/ci-templates publish workflows.
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/buijs-dev/$repository")
+            credentials {
+                username = providers.environmentVariable("GITHUB_ACTOR").orNull
+                password = providers.environmentVariable("GITHUB_TOKEN").orNull
+            }
+        }
+
+        maven {
+            name = "Repsy"
+            url = uri("https://repo.repsy.io/mvn/buijs-dev/maven")
+            credentials {
+                username = providers.environmentVariable("REPSY_USERNAME").orNull
+                password = providers.environmentVariable("REPSY_PASSWORD").orNull
+            }
+        }
+    }
+}

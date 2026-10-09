@@ -265,6 +265,9 @@ class PlaysetIdGenerator(private val uuidGenerator: StandardUuidGenerator) :
 }
 ```
 
+A generator for a wrapper type like this one can also be generated with
+[`@BuildTypeGenerator`](#buildtypegenerator); then don't write it by hand.
+
 Set a key to use a dedicated generator, for example to fill a relation with the current user:
 
 ```kotlin
@@ -586,8 +589,8 @@ data class Game(
 )
 ```
 
-`alias` overrides the name callers use: `?filter=title==foo` instead of `?filter=name==foo`. REST DTO property
-matching stays permissive: both the real name and the alias bind.
+`alias` overrides the name callers use: `?filter=title==foo` instead of `?filter=name==foo`. It plays no part in
+the REST DTO mapping; use [`@RestProperty`](#restproperty) for that.
 
 ```kotlin
 @SearchFilter(alias = "title")
@@ -674,7 +677,8 @@ class PlaysetIdGenerator(private val source: StandardUuidGenerator) : TypeGenera
 ```
 
 The bean has the same package and visibility as the annotated type. Its key is derived from the type
-(`generatePlaysetId`), so it serves every [`@DomainCreateGenerated`](#domaincreategenerated) property of that type.
+(`generatePlaysetId`), so it serves every [`@DomainCreateGenerated`](#domaincreategenerated) and
+[`@DomainUpdateGenerated`](#domainupdategenerated) property of that type.
 Set `key` to serve a keyed property instead:
 
 ```kotlin
@@ -709,7 +713,7 @@ internal data class BggRankingEntry(
 ```
 
 Generates `CreateBggRankingEntryCsvRowMapper : CsvRowMapper<CreateBggRankingEntry>`. On any other class, such as a
-hand-written command, it reads every constructor property that isn't `@CsvIgnore`.
+plain data class, it reads every constructor property that isn't `@CsvIgnore`.
 
 ### `@CsvColumn` and `@CsvIgnore`
 

@@ -1,6 +1,8 @@
 # Stratastax Entity
 [![](https://img.shields.io/badge/Buijs-Software-blue)](https://buijs.dev/)
 [![GitHub](https://img.shields.io/github/license/buijs-dev/stratastax-entity?color=black)](https://github.com/buijs-dev/stratastax-entity/blob/main/LICENSE)
+[![CodeScene Average Code Health](https://codescene.io/projects/85873/status-badges/average-code-health)](https://codescene.io/projects/85873)
+[![CodeScene System Mastery](https://codescene.io/projects/85873/status-badges/system-mastery)](https://codescene.io/projects/85873)
 
 Building blocks for annotation-driven entity modelling on the JVM (Kotlin). This library (`entity-core`) contains
 no runtime logic of its own for persistence or REST: it defines the annotations and small runtime types that the
@@ -23,7 +25,7 @@ meanings throughout this project.
 
 | Term                      | Meaning                                                                                                                                                                                                     |
 |---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Constructor parameter** | The Kotlin constructor parameter on which an annotation is placed. Almost all annotations target `VALUE_PARAMETER`; the exceptions target a class.                                                          |
+| **Constructor parameter** | The Kotlin constructor parameter on which an annotation is placed. Almost all annotations target `VALUE_PARAMETER`; the exceptions target a class, and `@RestProperty` also a property.                     |
 | **Property**              | The domain/entity property represented by a constructor parameter. This is the name used when matching domain commands and entity properties.                                                               |
 | **Column**                | A database column to which a persistence property is mapped. A column is identified by `@PersistenceColumn` or resolved from the entity's default table.                                                    |
 | **Entity**                | A domain object that is persisted. `@DomainEntity` describes the domain model; `@PersistenceEntity` describes its database representation.                                                                  |
@@ -60,10 +62,12 @@ Kotlin model
 The annotations in this library have `SOURCE` retention: they are consumed at build time and are not available at
 runtime. The following Stratastax tools use them:
 
-| Tool               | Uses                                                                                           |
-|--------------------|------------------------------------------------------------------------------------------------|
-| `gradle-plugin`    | Scans the annotations in source and generates code. Also reads the `key` of a `TypeGenerator`. |
-| `persistence-jooq` | Generates the jOOQ persistence layer; consumes `PatchField` in `toUpdateEntry` and friends.    |
+| Tool                    | Uses                                                                                            |
+|-------------------------|-------------------------------------------------------------------------------------------------|
+| `codegen-gradle-plugin` | Scans the annotations in source and generates code. Also reads the `key` of a `TypeGenerator`.  |
+| `persistence-core`      | The jOOQ persistence layer; consumes `PatchField` in `toUpdateEntry` and friends.               |
+| `search-core`           | Sorting, filtering and pagination on top of `EntityField`, `Sort` and `FieldMapping`.           |
+| `persistence-csv`       | Runs the `CsvRowMapper` generated for `@CsvImport`.                                             |
 
 ## Contents
 Package `dev.buijs.stratastax.entity.core`:
@@ -73,7 +77,9 @@ Package `dev.buijs.stratastax.entity.core`:
 | Type                       | Description                                                                                      |
 |----------------------------|--------------------------------------------------------------------------------------------------|
 | `PatchField<T>`            | `Unset` or `Value(x)`; use it for optional properties of an update command (PATCH semantics).    |
+| `isProvided`               | `true` for `Value`, `false` for `Unset`.                                                         |
 | `orKeep`, `orKeepRequired` | Merge a `PatchField` with the current value; the latter rejects `Value(null)`.                   |
+| `nullAs`                   | Replaces `Value(null)` with a value, e.g. an empty collection; `Unset` stays `Unset`.            |
 | `toTargetIdsOrNull`        | Target-id set for a many-to-many sync, or `null` when the relation must not be touched.          |
 | `orNullIfUnset`            | Child collection of a managed 1:N group; an empty collection means "remove all children".        |
 | `EntityField`              | A named field with its `EntityFieldType`, whether it is sortable/filterable and its enum values. |
@@ -84,10 +90,10 @@ Package `dev.buijs.stratastax.entity.core`:
 
 ### `spi`
 
-| Type                 | Description                                                                                                              |
-|----------------------|--------------------------------------------------------------------------------------------------------------------------|
-| `FieldMapping<F>`    | Maps search field names to a backend-specific field `F`; unknown names throw `UnknownFieldException`.                    |
-| `TypeConverter<T,R>` | Converts a raw value to another type, `null` included. Generated by `@BuildTypeConverter`.                            |
+| Type                 | Description                                                                                                                                              |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `FieldMapping<F>`    | Maps search field names to a backend-specific field `F`; unknown names throw `UnknownFieldException`.                                                    |
+| `TypeConverter<T,R>` | Converts a raw value to another type, `null` included. Generated by `@BuildTypeConverter`.                                                               |
 | `TypeGenerator<T>`   | Generates a value for a `@DomainCreateGenerated`/`@DomainUpdateGenerated` field. Its `key` must be a string literal. Generated by `@BuildTypeGenerator`. |
 
 ### `spi.annotations`
@@ -101,7 +107,7 @@ Package `dev.buijs.stratastax.entity.core`:
 | Commands    | `@DomainCreate`, `@DomainUpdate`                                                                                                                                  |
 | REST        | `@RestEntity`, `@RestProperty`                                                                                                                                    |
 | Search      | `@SearchFilter`, `@SearchFixedFilter`, `@SearchSort`                                                                                                              |
-| Types       | `@BuildTypeConverter`, `@BuildTypeGenerator`                                                                                                                |
+| Types       | `@BuildTypeConverter`, `@BuildTypeGenerator`                                                                                                                      |
 | CSV         | `@CsvImport`, `@CsvColumn`, `@CsvIgnore`                                                                                                                          |
 
 See [ANNOTATIONS.md](ANNOTATIONS.md) for an example of every annotation.
@@ -135,11 +141,11 @@ data class UpdatePlayset(val name: PatchField<String> = PatchField.Unset)
 ### Generated values
 A property that is not supplied by a command but generated is marked with one of:
 
-| Annotation                      | Generated by                                                     | When            |
-|---------------------------------|------------------------------------------------------------------|-----------------|
+| Annotation                    | Generated by                                                     | When            |
+|-------------------------------|------------------------------------------------------------------|-----------------|
 | `@DomainCreateGenerated(key)` | the application, via the `TypeGenerator` with the matching `key` | on create       |
 | `@DomainUpdateGenerated(key)` | the application, via the `TypeGenerator` with the matching `key` | on every update |
-| `@PersistenceGenerated`         | the database (e.g. an identity column or column default)         | on create       |
+| `@PersistenceGenerated`       | the database (e.g. an identity column or column default)         | on create       |
 
 The `key` is optional. When blank, it is derived from the property type as `generate${Type}`, so all properties of
 one type share one generator (a `TypeGenerator` without a key serves those). Set a key to use a dedicated generator 
@@ -167,7 +173,7 @@ data class Match(
     @DomainCreateGenerated("currentPrincipal")
     @DomainUpdateGenerated("currentPrincipal")
     @PersistenceJoinOne("LAST_EDITED_BY_USER_ID")
-    val lastEditedBy: UserRef,
+    val lastEditedBy: UserRef?,
 )
 
 internal class CurrentPrincipalGenerator : TypeGenerator<UserRef>("currentPrincipal") {

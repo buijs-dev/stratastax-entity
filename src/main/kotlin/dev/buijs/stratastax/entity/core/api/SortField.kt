@@ -46,7 +46,6 @@ data class SortField(
 
 /** Direction of a [SortField]. */
 enum class SortDirection {
-
     ASC,
     DESC,
     ;

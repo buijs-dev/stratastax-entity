@@ -2,7 +2,7 @@
 dokka = "2.2.0"
 jacoco = "0.8.15"
 kover = "0.9.11"
-stratastax-style = "1.0.0-SNAPSHOT"
+stratastax-style = "1.0.0"
 assertj = "3.27.7"
 junit = "6.1.2"
 kotlin = "2.4.20"

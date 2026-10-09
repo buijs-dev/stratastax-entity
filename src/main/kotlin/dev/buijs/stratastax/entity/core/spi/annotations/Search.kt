@@ -25,8 +25,8 @@ import dev.buijs.stratastax.entity.core.api.SortDirection
  * Mutually exclusive with [SearchFixedFilter].
  *
  * @property alias When non-blank, overrides the field's search-facing name (e.g.
- *   `?filter=name==foo` instead of `?filter=displayName==foo`). REST DTO property matching stays
- *   permissive: both the real name and the alias bind.
+ *   `?filter=name==foo` instead of `?filter=displayName==foo`). It plays no part in the REST DTO
+ *   mapping; use [RestProperty] for that.
  */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.VALUE_PARAMETER)

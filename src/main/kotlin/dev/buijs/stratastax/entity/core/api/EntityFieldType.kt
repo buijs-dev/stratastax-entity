@@ -18,7 +18,6 @@ package dev.buijs.stratastax.entity.core.api
 
 /** The data types an [EntityField] can have. */
 enum class EntityFieldType {
-
     STRING,
     NUMBER,
     BOOLEAN,

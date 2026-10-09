@@ -148,10 +148,10 @@ annotation class PersistenceManageLinks
  * Applies to [PersistenceJoinOne], [PersistenceJoinMany] and [PersistenceJoinManyThrough]. Mutually
  * exclusive with [PersistenceManageLinks].
  *
- * For a to-one relation, the create/update command must contain a property named after the relation
- * and typed as the target's create/update command.
- *
- * For a to-many relation, the name matches child command properties.
+ * With [DomainCreate], the generated create command contains a property named after the relation
+ * and typed as the target's create command (a list of them for a to-many relation). With
+ * [DomainUpdate], only a [PersistenceJoinMany] with [OneToManyUpdateStrategy.REPLACE_ALL] is
+ * supported; a managed to-one child cannot be updated through the update command.
  *
  * For a junction relation, target rows are deleted as well. Use [PersistenceManageLinks] instead
  * when this entity owns only the junction links.

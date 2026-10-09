@@ -44,7 +44,7 @@ annotation class RestEntity(
 /**
  * The REST DTO property of this property or parameter, when it differs from the domain: in the
  * response DTO and in the request DTOs alike. Without it, a response DTO property has the name of
- * the entity property, and a request DTO-property the name of the command property it is written
+ * the entity property, and a request DTO property the name of the command property it is written
  * to.
  *
  * On a property in the class body, it also adds the property to the response DTO.

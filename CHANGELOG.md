@@ -8,31 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `@SearchFilter`, `@SearchSort` and `@SearchFixedFilter`, replacing `@Filter`/`@Sort` from `search-core`.
-- `@PersistenceJoinManyThrough` for M:N relations through a junction table.
-- `RestProperty.type`, replacing `@ApiType`.
-- `@BuildTypeGenerator` to generate a `TypeGenerator` bean for a wrapper type.
-- `@DomainCreate` and `@DomainUpdate` to generate the create and update command from the entity's properties.
-- `PatchField.nullAs(replacement)`, so an explicit `null` can mean e.g. an empty collection.
-- `@CsvImport`, `@CsvColumn` and `@CsvIgnore`, moved from `persistence-csv`. `@CsvImport` may be put on a `@DomainEntity`.
-
-### Changed
-
-- `@GenerateTypeConverter` is renamed to `@BuildTypeConverter`.
-- `@DomainCreateFunction`/`@DomainUpdateFunction` are renamed to `@DomainCreateGenerated`/`@DomainUpdateGenerated`.
-- `@DomainEntityProjection(target)` is renamed to `@DomainEntityProjection(entity)`.
-- `@PersistenceJoin(from)` is renamed to `@PersistenceJoinOne(foreignKey)`.
-- `@PersistenceJoinMany` takes only the target's `foreignKey`; the junction form moved to `@PersistenceJoinManyThrough`.
-  Referenced key columns are resolved from the database schema.
-- `@PersistenceSoftDelete` implies `@SearchFixedFilter("null")`.
-- `@PersistenceColumn.reference` is required.
-- `@ApiEntity`/`@ApiRead` are renamed to `@RestEntity`/`@RestProperty`. `@RestEntity` also declares the `create` and
-  `update` request DTOs, `Nothing::class` meaning none; it requires at least one of its four DTOs. `@RestProperty(name)`
-  names the DTO property in requests too, and `@SearchFilter(alias)` no longer binds DTO properties.
-
-### Removed
-
-- `@ApiType`; use `@RestProperty(type = ...)`.
-- `@CreatesDomainEntity`/`@UpdatesDomainEntity` and `@DomainCreateProperty`/`@DomainUpdateProperty`: hand-written commands are
-  no longer supported. Commands are generated from `@DomainCreate`/`@DomainUpdate`, and `property = ...` names a
-  command property.
+- `PatchField` (`Unset`/`Value`, `isProvided`) for PATCH semantics in update commands, with `orKeep`,
+  `orKeepRequired`, `nullAs`, `toTargetIdsOrNull` and `orNullIfUnset`.
+- `EntityField` and `EntityFieldType` to describe a searchable field, and `Sort`, `SortField`, `asc`/`desc` and
+  `SortDirection` (`SortDirection.of` parses case-insensitively).
+- `FieldMapping` and `UnknownFieldException` to map search field names to a backend-specific field.
+- `TypeConverter` and `TypeGenerator`; a `TypeGenerator` is matched to generated properties by its string-literal
+  `key`, or by type when it has none.
+- Domain: `@DomainEntity` and `@DomainEntityProjection(entity)`. `@DomainCreate` and `@DomainUpdate` generate the
+  `Create${Entity}` and `Update${Entity}` commands from the entity's properties (`PatchField` in the update command),
+  with `type` and `property` to override the derived command property.
+- Generated values: `@DomainCreateGenerated` and `@DomainUpdateGenerated` (by the application, through a
+  `TypeGenerator`) and `@PersistenceGenerated` (by the database).
+- Persistence: `@PersistenceEntity`, `@PersistenceColumn`, `@PersistenceId`, `@PersistenceVersion` and
+  `@PersistenceSoftDelete`, which implies `@SearchFixedFilter("null")`.
+- Relations: `@PersistenceJoinOne(foreignKey)` (N:1, 1:1), `@PersistenceJoinMany(foreignKey)` (1:N) and
+  `@PersistenceJoinManyThrough(foreignKey, targetForeignKey)` (M:N through a junction table); referenced key columns
+  are resolved from the database schema. `@PersistenceManageLinks` writes only the link, `@PersistenceManageChildren`
+  also the target rows, reconciled by `OneToManyUpdateStrategy` (`UPSERT`, `REPLACE_ALL`).
+- REST: `@RestEntity(read, readAll, create, update)` declares the DTOs of an entity, falling back to the schema named
+  by convention, with `Nothing::class` meaning none; `@RestProperty(name, type)` names and converts a DTO property.
+- Search: `@SearchFilter(alias)`, `@SearchFixedFilter(value)` and `@SearchSort(tiebreaker, direction)`.
+- Types: `@BuildTypeConverter(target)` generates a `TypeConverter` pair for an enum or sealed hierarchy, and
+  `@BuildTypeGenerator(source, key)` a `TypeGenerator` for a wrapper type.
+- CSV: `@CsvImport`, `@CsvColumn` and `@CsvIgnore`; `@CsvImport` on a `@DomainEntity` reads its create command.
+- README.md and ANNOTATIONS.md with the terminology and an example of every annotation.
