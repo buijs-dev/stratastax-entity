@@ -1,6 +1,7 @@
 # Stratastax Entity
 [![](https://img.shields.io/badge/Buijs-Software-blue)](https://buijs.dev/)
 [![GitHub](https://img.shields.io/github/license/buijs-dev/stratastax-entity?color=black)](https://github.com/buijs-dev/stratastax-entity/blob/main/LICENSE)
+[![codecov](https://codecov.io/gh/buijs-dev/stratastax-entity/graph/badge.svg?token=BNKJJFHIcP)](https://codecov.io/gh/buijs-dev/stratastax-entity)
 [![CodeScene Average Code Health](https://codescene.io/projects/85873/status-badges/average-code-health)](https://codescene.io/projects/85873)
 [![CodeScene System Mastery](https://codescene.io/projects/85873/status-badges/system-mastery)](https://codescene.io/projects/85873)
 
