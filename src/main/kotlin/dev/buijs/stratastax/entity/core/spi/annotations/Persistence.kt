@@ -33,7 +33,7 @@ annotation class PersistenceColumn(
  * Declares the default table of a class so its [PersistenceColumn] references can omit the table.
  *
  * When [table] is blank, it is derived from the uppercased simple class name (`Playset` ->
- * `"PLAYSET"`). The same default is used for persistence join group types.
+ * `"PLAYSET"`). The same default is used for the target types of relations.
  */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.CLASS)

@@ -1,79 +1,67 @@
-# Annotations
+# Annotations by example
 
-Examples of every annotation in `dev.buijs.stratastax.entity.core.spi.annotations`. The examples are taken
-(simplified) from `stratastax-engine`. See the [README](README.md#terminology) for the terminology used here.
+Every section starts with something you want to do, shows the annotations that do it and, where code is generated,
+what you get. See the [README](README.md#terminology) for the terminology used here and the
+[reference](#reference) at the end for a one-line summary of every annotation. 
+The [stratastax-codegen › codegen-gradle-plugin](https://github.com/buijs-dev/stratastax-codegen/tree/main/codegen-gradle-plugin) is responsible
+for the actual code generation (without it these annotations are worthless).
 
-- [Domain](#domain)
-    - [`@DomainEntity`](#domainentity)
-    - [`@DomainCreate` and `@DomainUpdate`](#domaincreate-and-domainupdate)
-    - [`@DomainEntityProjection`](#domainentityprojection)
-- [Persistence](#persistence)
-    - [`@PersistenceEntity` and `@PersistenceColumn`](#persistenceentity-and-persistencecolumn)
-    - [`@PersistenceId`, `@PersistenceVersion` and `@PersistenceSoftDelete`](#persistenceid-persistenceversion-and-persistencesoftdelete)
-- [Generated values](#generated-values)
-    - [`@DomainCreateGenerated`](#domaincreategenerated)
-    - [`@DomainUpdateGenerated`](#domainupdategenerated)
-    - [`@PersistenceGenerated`](#persistencegenerated)
-- [Relations](#relations)
-    - [`@PersistenceJoinOne` with `@PersistenceManageLinks`](#persistencejoinone-with-persistencemanagelinks)
-    - [`@PersistenceJoinOne` with `@PersistenceManageChildren`](#persistencejoinone-with-persistencemanagechildren)
-    - [`@PersistenceJoinMany` with `@PersistenceManageChildren`](#persistencejoinmany-with-persistencemanagechildren)
-    - [`@PersistenceJoinManyThrough` with `@PersistenceManageLinks`](#persistencejoinmanythrough-with-persistencemanagelinks)
-    - [Read-only relations](#read-only-relations)
-- [REST](#rest)
-    - [`@RestEntity`](#restentity)
-    - [`@RestProperty`](#restproperty)
-- [Search](#search)
-    - [`@SearchFilter`](#searchfilter)
-    - [`@SearchFixedFilter`](#searchfixedfilter)
-    - [`@SearchSort`](#searchsort)
-- [Types](#types)
-    - [`@BuildTypeConverter`](#buildtypeconverter)
-    - [`@BuildTypeGenerator`](#buildtypegenerator)
-- [CSV](#csv)
-    - [`@CsvImport`](#csvimport)
-    - [`@CsvColumn` and `@CsvIgnore`](#csvcolumn-and-csvignore)
+1. [Define an entity](#define-an-entity)
+2. [Let callers create and update it](#let-callers-create-and-update-it)
+3. [Protect against concurrent edits and keep deleted rows](#protect-against-concurrent-edits-and-keep-deleted-rows)
+4. [Generate values instead of asking for them](#generate-values-instead-of-asking-for-them)
+5. [Relate entities](#relate-entities)
+6. [Read a lighter view](#read-a-lighter-view)
+7. [Expose it over REST](#expose-it-over-rest)
+8. [Make it searchable](#make-it-searchable)
+9. [Convert enums and sealed types](#convert-enums-and-sealed-types)
+10. [Import it from CSV](#import-it-from-csv)
+11. [Reference](#reference)
 
-## Domain
+## Define an entity
 
-### `@DomainEntity`
-
-Marks a data class as a root entity.
+A data class with `@DomainEntity` is an entity. `@PersistenceEntity` names its table, `@PersistenceColumn` maps each
+property to a column and `@PersistenceId` marks the identity.
 
 ```kotlin
 @DomainEntity
 @PersistenceEntity("PLAYSET")
 data class Playset(
     @PersistenceId
-    @PersistenceColumn("PUBLIC_ID")
+    @PersistenceColumn("PUBLIC_ID")        // PLAYSET.PUBLIC_ID
     val id: PlaysetId,
 
-    @PersistenceColumn("DISPLAY_NAME")
+    @PersistenceColumn("DISPLAY_NAME")     // PLAYSET.DISPLAY_NAME
     val displayName: String,
 )
 ```
 
-A class that is also used as the group type of a [relation](#relations), or that is a `@DomainEntityProjection`,
-is never a root.
+Good to know:
+- Without a table name, `@PersistenceEntity` uses the uppercased class name: `Playset` → `PLAYSET`.
+- A bare column name is resolved against that table; a name containing `.` (`"GAME.NAME"`) is used as written. Bare
+  names only work on a `@PersistenceEntity`; elsewhere, such as on a [projection](#read-a-lighter-view), write
+  fully qualified names.
+- A class that is the target type of a [relation](#relate-entities), or a
+  [projection](#read-a-lighter-view), is never a root entity, even with `@DomainEntity`.
 
-### `@DomainCreate` and `@DomainUpdate`
+## Let callers create and update it
 
-Mark the entity properties a command may set. The create and update command are then generated as
-`Create${Entity}` and `Update${Entity}`, in the package and with the visibility of the entity:
+Mark the properties a caller may set with `@DomainCreate` and/or `@DomainUpdate`. You get a `Create{Entity}` and an
+`Update{Entity}` command: plain data classes, in the package and with the visibility of the entity.
 
 ```kotlin
 @DomainEntity
-@PersistenceEntity("CLAIM_REQUEST")
-internal data class ClaimRequest(
+@PersistenceEntity("GAME")
+internal data class Game(
     @PersistenceId
     @DomainCreateGenerated
     @PersistenceColumn("PUBLIC_ID")
-    val id: ClaimRequestId,
+    val id: GameId,
 
     @DomainCreate
-    @PersistenceManageLinks
-    @PersistenceJoinOne("CANONICAL_PLAYER_ID")
-    val canonicalPlayer: CanonicalPlayerRef,
+    @DomainUpdate
+    @PersistenceColumn("NAME")
+    val name: String,
 
     @DomainCreate
     @DomainUpdate
@@ -81,138 +69,46 @@ internal data class ClaimRequest(
     val status: ApprovalStatus = ApprovalStatus.Pending,
 
     @DomainCreate
-    @DomainUpdate
-    @PersistenceManageLinks
-    @PersistenceJoinManyThrough("CLAIM_REQUEST_TARGET.CLAIM_REQUEST_ID", "CLAIM_REQUEST_TARGET.GHOST_PLAYER_ID")
-    val ghostPlayers: List<GhostPlayerRef>,
-)
-```
-
-Generates plain data classes, without annotations:
-
-```kotlin
-internal data class CreateClaimRequest(
-    val canonicalPlayerId: CanonicalPlayerId,
-    val status: ApprovalStatus = ApprovalStatus.Pending,
-    val ghostPlayers: List<GhostPlayerId>,
+    @PersistenceColumn("PUBLISHER")
+    val publisher: String?,
 )
 
-internal data class UpdateClaimRequest(
-    val status: PatchField<ApprovalStatus> = PatchField.Unset,
-    val ghostPlayers: PatchField<List<GhostPlayerId>> = PatchField.Unset,
-)
-```
-
-How a command property is derived from the entity property:
-
-| Entity property                                                     | Create command                 | Update command                             |
-|---------------------------------------------------------------------|--------------------------------|--------------------------------------------|
-| scalar `x: T`                                                       | `x: T`                         | `x: PatchField<T>`                         |
-| `@PersistenceJoinOne` + `@PersistenceManageLinks`, `foo: FooRef`    | `fooId: FooId`                 | `fooId: PatchField<FooId>`                 |
-| `@PersistenceJoinManyThrough` + `@PersistenceManageLinks`           | `foos: List<FooId>`            | `foos: PatchField<List<FooId>>`            |
-| `@PersistenceJoinOne` + `@PersistenceManageChildren`, `child: Child` | `child: CreateChild`          | not supported                              |
-| `@PersistenceJoinMany` + `@PersistenceManageChildren(REPLACE_ALL)`  | `children: List<CreateChild>`  | `children: PatchField<List<CreateChild>?>` |
-
-- Nullability follows the entity property. A Kotlin default on the entity property is copied to the create command,
-  so the caller may leave it out.
-- The id type of a relation target is the `@PersistenceId` type of the entity a `@DomainEntityProjection` reads, else
-  `FooId` next to a `FooRef`. Set `type` when neither applies: `@DomainCreate(type = FooId::class)`.
-- Set `property` to name the command property differently: `@DomainCreate(property = "matchId")`.
-- A managed child's create command is generated from the child's own `@DomainCreate` properties.
-- Generated values (`@DomainCreateGenerated`/`@DomainUpdateGenerated`, `@PersistenceGenerated`), `@PersistenceVersion`
-  and `@PersistenceSoftDelete` can't be set by a command, and neither can a read-only relation.
-- An update property is a `PatchField`: `Unset` leaves the property as it is, `Value` sets it, `Value(null)`
-  included. For a collection that is never `null`, `Value(null)` is written as an empty collection.
-- Commands are only generated; there are no hand-written commands.
-- [`@CsvImport`](#csvimport) on the entity reads the generated create command from CSV: every `@DomainCreate`
-  property, by its `@CsvColumn` name or its own name. A `@CsvIgnore` property is not read and needs a default.
-
-### `@DomainEntityProjection`
-
-Links a data class to a `@DomainEntity` as a read-only projection. The generated code then contains read/readAll
-methods that fetch only the projected data from the database. The target must be a `@DomainEntity`; the
-projection itself is not annotated with `@DomainEntity`.
-
-```kotlin
-@DomainEntity
-@PersistenceEntity("GAME")
-data class Game(
-    @PersistenceId
-    @PersistenceColumn("PUBLIC_ID")
-    val id: GameId,
-
-    @PersistenceColumn("NAME")
+// generated
+internal data class CreateGame(
     val name: String,
-
-    @PersistenceColumn("DESCRIPTION")
-    val description: String,
-
-    // ...
+    val status: ApprovalStatus = ApprovalStatus.Pending,
+    val publisher: String?,
 )
 
-@DomainEntityProjection(Game::class)
-data class GameRef(
-    @PersistenceColumn("GAME.PUBLIC_ID")
-    val id: GameId,
-
-    @PersistenceColumn("GAME.NAME")
-    val displayName: String,
+internal data class UpdateGame(
+    val name: PatchField<String> = PatchField.Unset,
+    val status: PatchField<ApprovalStatus> = PatchField.Unset,
 )
 ```
 
-Using the generated projection method:
+Every update property is a `PatchField`, so a caller only sends what changes:
 
-```kotlin
-suspend fun getGameSuggestions(query: String): List<GameRef> =
-    readAccess.findAllGameRef { filter { and(search.name.like(query)) } }
-```
+| Caller sends                 | Effect                                                                      |
+|------------------------------|-----------------------------------------------------------------------------|
+| `PatchField.Unset` (default) | the property is left as it is                                               |
+| `PatchField.Value(x)`        | the property is set to `x`                                                  |
+| `PatchField.Value(null)`     | the property is cleared; for a collection, it is set to an empty collection |
 
-## Persistence
+Good to know:
+- Nullability follows the entity property, and a Kotlin default is copied to the create command so the caller may
+  leave it out.
+- An entity without `@DomainCreate` properties has no create command; the same goes for `@DomainUpdate`.
+- `property` renames the command property: `@DomainCreate(property = "matchId")`. Not on a
+  `@PersistenceJoinManyThrough` relation, which always keeps the name of the entity property.
+- `type` sets the command property type when it can't be derived: `@DomainCreate(type = FooId::class)`.
+- Generated values, `@PersistenceVersion`, `@PersistenceSoftDelete` and read-only relations can't be in a command.
+- Relations are in a command too, see [Relate entities](#relate-entities).
+- Commands are always generated; there are no hand-written commands.
 
-### `@PersistenceEntity` and `@PersistenceColumn`
+## Protect against concurrent edits and keep deleted rows
 
-`@PersistenceEntity` declares the default table of a class. `@PersistenceColumn` maps a constructor parameter
-to a column. A bare column name is resolved against the default table; a reference containing `.` is used as
-written.
-
-```kotlin
-@DomainEntity
-@PersistenceEntity("MATCH_LOADOUT")
-data class MatchLoadout(
-    @PersistenceId
-    @PersistenceColumn("PUBLIC_ID")            // MATCH_LOADOUT.PUBLIC_ID
-    val id: MatchLoadoutId,
-
-    @PersistenceColumn("ATTRIBUTES")           // MATCH_LOADOUT.ATTRIBUTES
-    val attributes: Map<String, Any?>,
-)
-```
-
-When `table` is blank, it is derived from the uppercased simple class name:
-
-```kotlin
-@DomainEntity
-@PersistenceEntity                             // table "PLAYSET"
-data class Playset(
-    @PersistenceColumn("PUBLIC_ID")            // PLAYSET.PUBLIC_ID
-    val id: PlaysetId,
-)
-```
-
-Bare names are only resolved on a `@PersistenceEntity`; elsewhere, such as on a projection, use fully qualified
-references:
-
-```kotlin
-@DomainEntityProjection(Game::class)
-data class GameRef(
-    @PersistenceColumn("GAME.PUBLIC_ID")
-    val id: GameId,
-)
-```
-
-### `@PersistenceId`, `@PersistenceVersion` and `@PersistenceSoftDelete`
-
-Mark the identity field, the optimistic-locking version field and the soft-delete column of an entity.
+`@PersistenceVersion` marks the optimistic-locking version. `@PersistenceSoftDelete` marks a nullable timestamp that
+is set on delete instead of deleting the row.
 
 ```kotlin
 @DomainEntity
@@ -222,89 +118,77 @@ data class Community(
     @PersistenceColumn("PUBLIC_ID")
     val id: CommunityId,
 
-    @PersistenceSoftDelete
-    @PersistenceColumn("DELETED_AT")
-    val deletedAt: OffsetDateTime? = null,
-
     @PersistenceVersion
     @PersistenceColumn("VERSION")
     val version: Long,
+
+    @PersistenceSoftDelete
+    @PersistenceColumn("DELETED_AT")
+    val deletedAt: OffsetDateTime? = null,
 )
 ```
 
-The soft-delete column is a nullable timestamp that is set to the current time on delete. It implies
-`@SearchFixedFilter("null")`, so soft-deleted rows are excluded from search results without further annotations.
-Do not combine it with `@SearchFilter`, `@SearchFixedFilter` or `@SearchSort`.
+Good to know:
+- Soft-deleted rows are left out of every search: `@PersistenceSoftDelete` implies `@SearchFixedFilter("null")`.
+  Don't combine it with `@SearchFilter`, `@SearchFixedFilter` or `@SearchSort`.
 
-## Generated values
+## Generate values instead of asking for them
 
-### `@DomainCreateGenerated`
-
-The value is generated by the application on create, by the `TypeGenerator` with the matching `key`. When the
-key is blank, it is derived from the property type as `generate${Type}`, so all properties of one type share one
-generator.
+Ids, timestamps and the current user are not supplied by the caller but generated.
 
 ```kotlin
 @DomainEntity
 @PersistenceEntity("PLAYSET")
 data class Playset(
     @PersistenceId
-    @DomainCreateGenerated                      // key "generatePlaysetId"
+    @DomainCreateGenerated                       // on create, by the generator for PlaysetId
     @PersistenceColumn("PUBLIC_ID")
     val id: PlaysetId,
 
-    @DomainCreateGenerated                      // key "generateOffsetDateTime"
+    @DomainCreateGenerated                       // on create, by the generator for OffsetDateTime
     @PersistenceColumn("CREATED_AT")
     val createdAt: OffsetDateTime,
+
+    @DomainUpdateGenerated                       // on every update
+    @PersistenceColumn("UPDATED_AT")
+    val updatedAt: OffsetDateTime? = null,
+
+    @DomainCreateGenerated("currentPrincipal")   // on create and update, by the "currentPrincipal" generator
+    @DomainUpdateGenerated("currentPrincipal")
+    @PersistenceJoinOne("LAST_EDITED_BY_USER_ID")
+    val lastEditedBy: UserRef?,
 )
+```
 
+The values come from `TypeGenerator` beans. Without a key, the generator is found by type; with a key, by that key:
+
+```kotlin
 @ApplicationScoped
-class PlaysetIdGenerator(private val uuidGenerator: StandardUuidGenerator) :
-    TypeGenerator<PlaysetId>() {
-    override fun generate(): PlaysetId = PlaysetId(uuidGenerator.generate())
+class OffsetDateTimeGenerator : TypeGenerator<OffsetDateTime>() {
+    override fun generate(): OffsetDateTime = OffsetDateTime.now()
 }
-```
 
-A generator for a wrapper type like this one can also be generated with
-[`@BuildTypeGenerator`](#buildtypegenerator); then don't write it by hand.
-
-Set a key to use a dedicated generator, for example to fill a relation with the current user:
-
-```kotlin
-@DomainCreateGenerated("currentPrincipal")
-@PersistenceJoinOne("OWNER_USER_ID")
-val owner: UserRef,
-```
-
-```kotlin
 internal class CurrentPrincipalGenerator : TypeGenerator<UserRef>("currentPrincipal") {
     override fun generate(): UserRef = ...
 }
 ```
 
-### `@DomainUpdateGenerated`
-
-Works like `@DomainCreateGenerated`, but the value is regenerated on every update.
-
-```kotlin
-@DomainUpdateGenerated
-@PersistenceColumn("UPDATED_AT")
-val updatedAt: OffsetDateTime? = null,
-```
-
-When a property has both, they must use the same key:
+For a wrapper type such as `PlaysetId`, let `@BuildTypeGenerator` write the generator. It wraps every value of the
+`source` generator:
 
 ```kotlin
-@DomainCreateGenerated("currentPrincipal")
-@DomainUpdateGenerated("currentPrincipal")
-@PersistenceJoinOne("LAST_EDITED_BY_USER_ID")
-val lastEditedBy: UserRef?,
+@BuildTypeGenerator(StandardUuidGenerator::class)
+@JvmInline
+value class PlaysetId(val value: UUID)
+
+// generated
+@ApplicationScoped
+class PlaysetIdGenerator(private val source: StandardUuidGenerator) : TypeGenerator<PlaysetId>() {
+    override fun generate(): PlaysetId = PlaysetId(source.generate())
+}
 ```
 
-### `@PersistenceGenerated`
-
-The value is generated by the database on insert (e.g. an identity column). Mutually exclusive with
-`@DomainCreateGenerated`.
+A value the database generates, such as an identity column, is marked with `@PersistenceGenerated`:
 
 ```kotlin
 @DomainEntity
@@ -317,29 +201,34 @@ data class UserIdentity(
 )
 ```
 
-## Relations
+Good to know:
+- Without a key, the key is `generate{Type}` (`generatePlaysetId`), so all properties of one type share one
+  generator. The key of a `TypeGenerator` must be a string literal: it is read from source at build time.
+- A property with both `@DomainCreateGenerated` and `@DomainUpdateGenerated` uses the same key in both.
+- `@DomainCreateGenerated` and `@PersistenceGenerated` can't be combined.
+- A `@BuildTypeGenerator` bean has the package and visibility of the wrapper type and the key `generate{Type}`. Set
+  `key` to serve a keyed property instead: `@BuildTypeGenerator(StandardUuidGenerator::class, key = "correlationId")`.
+  `source` is only matched by name. A hand-written `TypeGenerator` with the same key is a build error.
 
-Each relation names only foreign-key columns; the key columns they reference are resolved from the database schema.
+## Relate entities
 
-| Annotation                    | Relation                                         | Arguments                                  |
-|-------------------------------|--------------------------------------------------|--------------------------------------------|
-| `@PersistenceJoinOne`         | to-one (N:1 or 1:1), foreign key on this entity  | `foreignKey`: column of this entity        |
-| `@PersistenceJoinMany`        | to-many (1:N), foreign key on the target         | `foreignKey`: column of the target         |
-| `@PersistenceJoinManyThrough` | to-many (M:N) through a junction table           | `foreignKey`, `targetForeignKey`: columns of the junction table |
+Pick the annotations by what the entity should do with the other side:
 
-How the relation is written is decided by `@PersistenceManageLinks` (only the link) or `@PersistenceManageChildren`
-(the link and the target rows). The two are mutually exclusive, and not every combination is supported:
+| I want to …                                         | Use                                                       |
+|-----------------------------------------------------|-----------------------------------------------------------|
+| [refer to another entity](#refer-to-another-entity) | `@PersistenceJoinOne` + `@PersistenceManageLinks`         |
+| [own one child](#own-one-child)                     | `@PersistenceJoinOne` + `@PersistenceManageChildren`      |
+| [own a list of children](#own-a-list-of-children)   | `@PersistenceJoinMany` + `@PersistenceManageChildren`     |
+| [link many to many](#link-many-to-many)             | `@PersistenceJoinManyThrough` + `@PersistenceManageLinks` |
+| [only read the relation](#only-read-the-relation)   | any `@PersistenceJoin…`, without a `@PersistenceManage…`  |
 
-|                               | read-only | `@PersistenceManageLinks` | `@PersistenceManageChildren` | `REPLACE_ALL` |
-|-------------------------------|-----------|---------------------------|------------------------------|---------------|
-| `@PersistenceJoinOne`         | ✓         | ✓                         | ✓                            |               |
-| `@PersistenceJoinMany`        | ✓         |                           | ✓                            | ✓             |
-| `@PersistenceJoinManyThrough` | ✓         | ✓                         | ✓                            |               |
+A relation only names foreign-key columns; the key columns they reference are resolved from the database schema.
+`@PersistenceManageLinks` writes only the link (a foreign-key value or junction rows). `@PersistenceManageChildren`
+also creates, updates and deletes the rows on the other side, so only use it when no other parent shares them.
 
-### `@PersistenceJoinOne` with `@PersistenceManageLinks`
+### Refer to another entity
 
-`foreignKey` is the foreign-key column of this entity. Only the foreign-key value is written; the target row is not
-touched. The command supplies the id of the target.
+`foreignKey` is a column of this entity. Only that value is written; the command takes the id of the target.
 
 ```kotlin
 @DomainEntity
@@ -355,10 +244,13 @@ data class Playset(
 data class CreatePlayset(val gameId: GameId)
 ```
 
-### `@PersistenceJoinOne` with `@PersistenceManageChildren`
+The id type is the `@PersistenceId` type of the entity a `GameRef` [projection](#read-a-lighter-view) reads, else
+`GameId` next to `GameRef`; set `@DomainCreate(type = …)` when neither applies.
 
-The target row is created, updated and deleted together with this entity. The create command contains a property
-for the relation, typed as the target's create command.
+### Own one child
+
+The child row is created, updated and deleted together with this entity. The command takes the child's own create
+command, built from the child's `@DomainCreate` properties.
 
 ```kotlin
 @DomainEntity
@@ -371,7 +263,7 @@ data class User(
     @DomainCreate
     @PersistenceManageChildren
     @PersistenceJoinOne("CANONICAL_PLAYER_ID")
-    val canonicalPlayer: CanonicalPlayer,
+    val canonicalPlayer: CanonicalPlayer,     // may also be nullable: an optional child
 )
 
 // generated
@@ -381,21 +273,12 @@ data class CreateUser(
 )
 ```
 
-A managed child may be optional:
+A child owned through `@PersistenceJoinOne` can't be changed by the update command.
 
-```kotlin
-@PersistenceManageChildren
-@PersistenceJoinOne("LOADOUT_ID")
-val loadout: MatchLoadout?,
-```
+### Own a list of children
 
-Only manage a target as a child when it is not shared with other parents; otherwise rows that are still
-referenced elsewhere may be deleted.
-
-### `@PersistenceJoinMany` with `@PersistenceManageChildren`
-
-`foreignKey` is the column of the target table that references this entity. A bare column name is resolved
-against the default table of the target type.
+`foreignKey` is the column of the child table that references this entity; a bare name is resolved against the
+child's table.
 
 ```kotlin
 @DomainEntity
@@ -416,19 +299,19 @@ data class UpdateMatch(
 )
 ```
 
-`updateStrategy` decides how children are reconciled on update when the collection is supplied (not `Unset`). It
-applies only to `@PersistenceJoinMany`:
+The strategy decides what happens to the children when an update supplies the list:
 
-| Strategy           | Behaviour                                                                                         |
-|--------------------|---------------------------------------------------------------------------------------------------|
-| `UPSERT` (default) | Matches children by identity: updates matches, inserts new elements, deletes missing rows.        |
-| `REPLACE_ALL`      | Deletes all existing children and inserts every element as a new row with a generated identity. |
+| Strategy           | On update                                                                                 |
+|--------------------|-------------------------------------------------------------------------------------------|
+| `UPSERT` (default) | matches children by identity: updates matches, inserts new elements, deletes missing rows |
+| `REPLACE_ALL`      | deletes all children and inserts every element as a new row with a generated identity     |
 
-### `@PersistenceJoinManyThrough` with `@PersistenceManageLinks`
+Only `REPLACE_ALL` can be in an update command.
 
-`foreignKey` is the junction column referencing this entity and `targetForeignKey` the junction column
-referencing the target; both are fully qualified. With `@PersistenceManageLinks` only the junction rows are
-written; the target rows are not touched. The command supplies the target ids.
+### Link many to many
+
+`foreignKey` is the junction column that references this entity, `targetForeignKey` the one that references the
+target; both are fully qualified. Only junction rows are written; the command takes the target ids.
 
 ```kotlin
 @DomainEntity
@@ -449,13 +332,12 @@ data class UpdatePlayset(
 )
 ```
 
-Junction-table relations always replace their link rows completely. With `@PersistenceManageChildren` on a
-`@PersistenceJoinManyThrough`, the target rows are deleted as well.
+An update always replaces all junction rows. With `@PersistenceManageChildren` instead, the target rows are deleted
+as well.
 
-### Read-only relations
+### Only read the relation
 
-A relation without `@PersistenceManageLinks` or `@PersistenceManageChildren` is read-only: it is not written by a
-command.
+Without `@PersistenceManageLinks` or `@PersistenceManageChildren`, a relation is read but never written by a command.
 
 ```kotlin
 @DomainEntity
@@ -466,8 +348,8 @@ data class Game(
 )
 ```
 
-The link of a read-only `@PersistenceJoinOne` can still be set on create by a generator, see
-[`@DomainCreateGenerated`](#domaincreategenerated):
+A read-only `@PersistenceJoinOne` can still be filled on create by a
+[generator](#generate-values-instead-of-asking-for-them):
 
 ```kotlin
 @DomainCreateGenerated("currentPrincipal")
@@ -475,75 +357,76 @@ The link of a read-only `@PersistenceJoinOne` can still be set on create by a ge
 val owner: UserRef,
 ```
 
-## REST
+### Summary
 
-The REST annotations link domain types to the DTOs of the OpenAPI spec loaded for a codegen run. The referenced DTO
-classes are not used as types: only their names are matched against the spec. For every `@DomainEntity` with a
-matching DTO, a `${Entity}RestMapper` is generated:
+Supported combinations:
 
-- a response DTO (`read`, `readAll`) is filled from the entity;
-- a request DTO (`create`, `update`) is read into the generated create or update command
-  (see [`@DomainCreate` and `@DomainUpdate`](#domaincreate-and-domainupdate)).
+|                               | read-only | `@PersistenceManageLinks` | `@PersistenceManageChildren` | in update command  |
+|-------------------------------|-----------|---------------------------|------------------------------|--------------------|
+| `@PersistenceJoinOne`         | ✓         | ✓                         | ✓                            | links only         |
+| `@PersistenceJoinMany`        | ✓         |                           | ✓                            | `REPLACE_ALL` only |
+| `@PersistenceJoinManyThrough` | ✓         | ✓                         | ✓                            | links only         |
 
-Every property of a DTO must be mapped, or the build fails: a response property no entity property fills, and a
-request property no command property receives, are both errors.
+Command properties:
 
-A DTO property matches:
+| Entity property                                                      | Create command                | Update command                             |
+|----------------------------------------------------------------------|-------------------------------|--------------------------------------------|
+| scalar `x: T`                                                        | `x: T`                        | `x: PatchField<T>`                         |
+| `@PersistenceJoinOne` + `@PersistenceManageLinks`, `foo: FooRef`     | `fooId: FooId`                | `fooId: PatchField<FooId>`                 |
+| `@PersistenceJoinManyThrough` + `@PersistenceManageLinks`            | `foos: List<FooId>`           | `foos: PatchField<List<FooId>>`            |
+| `@PersistenceJoinOne` + `@PersistenceManageChildren`, `child: Child` | `child: CreateChild`          | not supported                              |
+| `@PersistenceJoinMany` + `@PersistenceManageChildren(REPLACE_ALL)`   | `children: List<CreateChild>` | `children: PatchField<List<CreateChild>?>` |
 
-| DTO                  | Matched to                                                                                               |
-|----------------------|----------------------------------------------------------------------------------------------------------|
-| response             | `@RestProperty(name)`, else the entity property name                                                     |
-| request              | `@RestProperty(name)`, else the command property name (`gameId` for `game`, `groupIds` for `groups` too) |
+## Read a lighter view
 
-`@SearchFilter(alias)` only names a search field; it plays no part in the DTO mapping.
-
-### `@RestEntity`
-
-Declares the DTOs of an entity: one entity (`read`), a page of entities (`readAll`), and the request of its create
-(`create`) and update (`update`). Each is optional and falls back to the schema named by convention (`playset`,
-`playset_list`, `create_playset`, `update_playset` for `Playset`). The annotation is repeatable, one per spec.
+`@DomainEntityProjection` reads only some columns of an entity into another data class. The read access of the
+entity then gets `findAll{Projection}` and `findAll{Projection}List` methods.
 
 ```kotlin
-@DomainEntity
-@RestEntity(PlaysetV1::class, PlaysetListV1::class)
-data class Playset(...)
+@DomainEntityProjection(Game::class)
+data class GameRef(
+    @PersistenceColumn("GAME.PUBLIC_ID")
+    val id: GameId,
+
+    @PersistenceColumn("GAME.NAME")
+    val displayName: String,
+)
+
+suspend fun getGameSuggestions(query: String): List<GameRef> =
+    readAccess.findAllGameRef { filter { and(search.name.like(query)) } }
 ```
 
-Only `read`:
+Good to know:
+- The target (`Game`) must be a `@DomainEntity`; the projection itself is not.
+- Columns of a projection are always fully qualified.
+
+## Expose it over REST
+
+`@RestEntity` names the DTOs of the OpenAPI spec loaded for a codegen run. For every entity with a matching DTO, a
+`{Entity}RestMapper` is generated that fills response DTOs from the entity and reads request DTOs into the
+[commands](#let-callers-create-and-update-it).
 
 ```kotlin
 @DomainEntity
-@RestEntity(PlaysetRefV1::class)
-@PersistenceEntity("PLAYSET")
-data class PlaysetRef(...)
-```
-
-`Nothing::class` declares there is no DTO to map in that direction: the endpoint's delegate receives the request DTO
-as is, for a create the generated mapping can't express.
-
-```kotlin
-@DomainEntity
-@RestEntity(ClaimRequestV1::class, ClaimRequestListV1::class, create = Nothing::class)
-data class ClaimRequest(...)
-```
-
-### `@RestProperty`
-
-Names the DTO property of a property when it differs from the domain, in the response and the request DTOs alike.
-Use the `@param:` use-site target on a constructor parameter:
-
-```kotlin
-@DomainEntity
-@RestEntity(GameV1::class, GameListV1::class)
+@RestEntity(GameV1::class, GameListV1::class)                  // read, readAll
 data class Game(
     @DomainCreate
-    @param:RestProperty("displayName")
+    @param:RestProperty("displayName")                         // "displayName" in the DTOs
     @PersistenceColumn("NAME")
     val name: String,
 )
 ```
 
-On a computed property in the class body, it also adds the property to the response DTO:
+The four DTOs are `read` (one entity), `readAll` (a page), `create` and `update`. Leave one out to use the schema
+named by convention (`game`, `game_list`, `create_game`, `update_game`), or pass `Nothing::class` when there is no
+DTO to map, e.g. a create the generated mapping can't express; the endpoint's delegate then gets the request DTO as is:
+
+```kotlin
+@RestEntity(PlaysetRefV1::class)                                                    // only read
+@RestEntity(ClaimRequestV1::class, ClaimRequestListV1::class, create = Nothing::class)
+```
+
+`@RestProperty` on a computed property adds it to the response DTO:
 
 ```kotlin
 @DomainEntity
@@ -553,15 +436,11 @@ data class Match(
     val lockedAt: OffsetDateTime?,
 ) {
     @RestProperty
-    val status: MatchStatus =
-        when {
-            lockedAt == null -> MatchStatus.Draft
-            else -> MatchStatus.Finalized
-        }
+    val status: MatchStatus = if (lockedAt == null) MatchStatus.Draft else MatchStatus.Finalized
 }
 ```
 
-`type` declares the DTO type to convert a property to. Like `@RestEntity`, only the name of the type is used.
+`type` converts the value to a DTO type, matched by name only:
 
 ```kotlin
 @DomainEntity
@@ -573,54 +452,19 @@ data class MatchBatchResultItem(
 )
 ```
 
-## Search
+Good to know:
+- DTO classes are only matched by name against the spec; they are never used as types.
+- A response DTO property matches `@RestProperty(name)`, else the entity property name. A request DTO property
+  matches `@RestProperty(name)`, else the command property name (`gameId` for `game`).
+- Every DTO property must be mapped, or the build fails.
+- Use the `@param:` use-site target on a constructor parameter.
+- `@RestEntity` is repeatable, one per spec.
+- `@SearchFilter(alias)` plays no part in the DTO mapping.
 
-### `@SearchFilter`
+## Make it searchable
 
-Marks a property as filterable by callers.
-
-```kotlin
-@DomainEntity
-@PersistenceEntity("GAME")
-data class Game(
-    @SearchFilter
-    @PersistenceColumn("NAME")
-    val name: String,
-)
-```
-
-`alias` overrides the name callers use: `?filter=title==foo` instead of `?filter=name==foo`. It plays no part in
-the REST DTO mapping; use [`@RestProperty`](#restproperty) for that.
-
-```kotlin
-@SearchFilter(alias = "title")
-@PersistenceColumn("NAME")
-val name: String,
-```
-
-### `@SearchFixedFilter`
-
-Applies a filter `property == value` to every search. Callers cannot see or override it. `value` is parsed like an
-RSQL value token: `null`, `true`/`false`, a plain number, or else a literal string. Timestamps and lists cannot be
-expressed this way; use the DSL's `fixedValue(...)` for those.
-
-```kotlin
-@DomainEntity
-@PersistenceEntity("ARTICLE")
-data class Article(
-    @SearchFixedFilter("true")
-    @PersistenceColumn("PUBLISHED")
-    val published: Boolean,
-)
-```
-
-A fixed filter is mutually exclusive with `@SearchFilter` and `@SearchSort`. A `@PersistenceSoftDelete` field needs
-no fixed filter: it already implies `@SearchFixedFilter("null")`.
-
-### `@SearchSort`
-
-Marks a property as sortable. `direction` is the default direction (`SortDirection.ASC` unless set).
-`tiebreaker` marks the single field that makes the order total; cursor pagination needs exactly one per entity.
+`@SearchFilter` lets callers filter on a property, `@SearchSort` sort on it, and `@SearchFixedFilter` applies a
+filter callers can't see or change.
 
 ```kotlin
 @DomainEntity
@@ -631,70 +475,52 @@ data class Game(
     @PersistenceColumn("PUBLIC_ID")
     val id: GameId,
 
+    @SearchFilter(alias = "title")                 // ?filter=title==foo
+    @PersistenceColumn("NAME")
+    val name: String,
+
     @SearchSort(direction = SortDirection.DESC)
     @PersistenceColumn("CREATED_AT")
     val createdAt: OffsetDateTime,
+
+    @SearchFixedFilter("true")                     // only published games, always
+    @PersistenceColumn("PUBLISHED")
+    val published: Boolean,
 )
 ```
 
-## Types
+Good to know:
+- Without `alias`, callers filter on the property name (`?filter=name==foo`).
+- `direction` is the default sort direction, `ASC` unless set.
+- Cursor pagination needs exactly one `tiebreaker`: the field that makes the order total.
+- A fixed filter value is parsed like an RSQL value: `null`, `true`/`false`, a plain number, or else a string.
+  Timestamps and lists can't be expressed; use the DSL's `fixedValue(...)` for those.
+- A fixed filter can't be combined with `@SearchFilter` or `@SearchSort`, and a `@PersistenceSoftDelete` property
+  needs none.
 
-### `@BuildTypeConverter`
+## Convert enums and sealed types
 
-Generates a `TypeConverter` pair between the annotated enum (or sealed interface of `data object`s) and `target`,
-one per direction, mapped member by member. `target` is `String` (`WinLoss` ↔ `"WIN_LOSS"`) or another closed type
-whose members match by name, ignoring case and underscores. Only the name of the target is used. The annotation is
-repeatable, so one type can convert to several targets.
+`@BuildTypeConverter` generates a pair of `TypeConverter`s, one per direction, between an enum (or a sealed
+interface of `data object`s) and `target`.
 
 ```kotlin
-@BuildTypeConverter(String::class)
-@BuildTypeConverter(MatchResultV1::class)
+@BuildTypeConverter(String::class)          // WinLoss <-> "WIN_LOSS"
+@BuildTypeConverter(MatchResultV1::class)   // WinLoss <-> MatchResultV1.WIN_LOSS
 sealed interface MatchResult {
     data object WinLoss : MatchResult
     data object Draw : MatchResult
 }
 ```
 
-### `@BuildTypeGenerator`
+Good to know:
+- Members are mapped by name, ignoring case and underscores.
+- `target` is `String` or another closed type, matched by name only.
+- The annotation is repeatable, so a type can convert to several targets.
 
-Generates a `TypeGenerator` bean for a wrapper type: a class with a single constructor property, such as a
-`@JvmInline value class`. The bean injects `source`, a `TypeGenerator` of the wrapped type, and wraps every value it
-generates. Only the name of `source` is used.
+## Import it from CSV
 
-```kotlin
-@BuildTypeGenerator(StandardUuidGenerator::class)
-@JvmInline
-value class PlaysetId(val value: UUID)
-```
-
-Generates:
-
-```kotlin
-@ApplicationScoped
-class PlaysetIdGenerator(private val source: StandardUuidGenerator) : TypeGenerator<PlaysetId>() {
-    override fun generate(): PlaysetId = PlaysetId(source.generate())
-}
-```
-
-The bean has the same package and visibility as the annotated type. Its key is derived from the type
-(`generatePlaysetId`), so it serves every [`@DomainCreateGenerated`](#domaincreategenerated) and
-[`@DomainUpdateGenerated`](#domainupdategenerated) property of that type.
-Set `key` to serve a keyed property instead:
-
-```kotlin
-@BuildTypeGenerator(StandardUuidGenerator::class, key = "correlationId")
-@JvmInline
-value class CorrelationId(val value: UUID)
-```
-
-A hand-written `TypeGenerator` with the same key is a build error.
-
-## CSV
-
-### `@CsvImport`
-
-Generates a `CsvRowMapper` (from `persistence-csv`) that reads one CSV row. On a `@DomainEntity`, it reads the entity's
-generated create command: every [`@DomainCreate`](#domaincreate-and-domainupdate) property, unless it is `@CsvIgnore`.
+`@CsvImport` generates a `CsvRowMapper` (from `persistence-csv`) that reads one CSV row. On an entity it reads the
+[create command](#let-callers-create-and-update-it).
 
 ```kotlin
 @CsvImport
@@ -702,28 +528,60 @@ generated create command: every [`@DomainCreate`](#domaincreate-and-domainupdate
 @PersistenceEntity("BGG_RANKING")
 internal data class BggRankingEntry(
     @DomainCreate
-    @CsvColumn("id")
+    @CsvColumn("id")                        // read from column "id"
     @PersistenceColumn("BGG_ID")
     val bggId: Long,
 
-    @DomainCreate
+    @DomainCreate                           // read from column "name"
     @PersistenceColumn("NAME")
     val name: String,
+
+    @DomainCreate
+    @CsvIgnore                              // not read, uses the default
+    @PersistenceColumn("SOURCE")
+    val source: String = "bgg",
 )
+
+// generated
+internal class CreateBggRankingEntryCsvRowMapper : CsvRowMapper<CreateBggRankingEntry>
 ```
 
-Generates `CreateBggRankingEntryCsvRowMapper : CsvRowMapper<CreateBggRankingEntry>`. On any other class, such as a
-plain data class, it reads every constructor property that isn't `@CsvIgnore`.
+Good to know:
+- Column names are matched ignoring case and underscores.
+- On an entity, every `@DomainCreate` property is read unless it is `@CsvIgnore`, which then needs a default.
+- On any other class, such as a plain data class, every constructor property is read unless it is `@CsvIgnore`.
 
-### `@CsvColumn` and `@CsvIgnore`
+## Reference
 
-A property is read from the column with its own name; column names are matched ignoring case and underscores.
-`@CsvColumn(name)` reads it from another column. `@CsvIgnore` leaves it out; on a `@DomainEntity`, it needs a default
-value.
+All annotations are in `dev.buijs.stratastax.entity.core.spi.annotations`. See the
+[API docs](https://buijs-dev.github.io/stratastax-entity/) for every parameter.
 
-```kotlin
-@DomainCreate
-@CsvIgnore
-@PersistenceColumn("SOURCE")
-val source: String = "bgg",
-```
+| Annotation                    | Does                                                      | Example                                                                             |
+|-------------------------------|-----------------------------------------------------------|-------------------------------------------------------------------------------------|
+| `@DomainEntity`               | marks a data class as an entity                           | [Define an entity](#define-an-entity)                                               |
+| `@DomainEntityProjection`     | reads part of an entity into another class                | [Read a lighter view](#read-a-lighter-view)                                         |
+| `@DomainCreate`               | adds a property to the create command                     | [Create and update](#let-callers-create-and-update-it)                              |
+| `@DomainUpdate`               | adds a property to the update command, as a `PatchField`  | [Create and update](#let-callers-create-and-update-it)                              |
+| `@DomainCreateGenerated`      | generates the value on create, by a `TypeGenerator`       | [Generated values](#generate-values-instead-of-asking-for-them)                     |
+| `@DomainUpdateGenerated`      | generates the value on every update, by a `TypeGenerator` | [Generated values](#generate-values-instead-of-asking-for-them)                     |
+| `@PersistenceEntity`          | sets the table of an entity                               | [Define an entity](#define-an-entity)                                               |
+| `@PersistenceColumn`          | maps a property to a column                               | [Define an entity](#define-an-entity)                                               |
+| `@PersistenceId`              | marks the identity                                        | [Define an entity](#define-an-entity)                                               |
+| `@PersistenceVersion`         | marks the optimistic-locking version                      | [Versions and soft delete](#protect-against-concurrent-edits-and-keep-deleted-rows) |
+| `@PersistenceSoftDelete`      | marks the soft-delete timestamp                           | [Versions and soft delete](#protect-against-concurrent-edits-and-keep-deleted-rows) |
+| `@PersistenceGenerated`       | lets the database generate the value                      | [Generated values](#generate-values-instead-of-asking-for-them)                     |
+| `@PersistenceJoinOne`         | to-one relation through a foreign key of this entity      | [Refer to another entity](#refer-to-another-entity)                                 |
+| `@PersistenceJoinMany`        | to-many relation through a foreign key of the target      | [Own a list of children](#own-a-list-of-children)                                   |
+| `@PersistenceJoinManyThrough` | many-to-many relation through a junction table            | [Link many to many](#link-many-to-many)                                             |
+| `@PersistenceManageLinks`     | writes only the link of a relation                        | [Relate entities](#relate-entities)                                                 |
+| `@PersistenceManageChildren`  | writes the link and the rows on the other side            | [Relate entities](#relate-entities)                                                 |
+| `@RestEntity`                 | names the REST DTOs of an entity                          | [Expose it over REST](#expose-it-over-rest)                                         |
+| `@RestProperty`               | renames, adds or converts a DTO property                  | [Expose it over REST](#expose-it-over-rest)                                         |
+| `@SearchFilter`               | lets callers filter on a property                         | [Make it searchable](#make-it-searchable)                                           |
+| `@SearchFixedFilter`          | applies a filter callers can't change                     | [Make it searchable](#make-it-searchable)                                           |
+| `@SearchSort`                 | lets callers sort on a property                           | [Make it searchable](#make-it-searchable)                                           |
+| `@BuildTypeConverter`         | generates `TypeConverter`s for an enum or sealed type     | [Convert enums and sealed types](#convert-enums-and-sealed-types)                   |
+| `@BuildTypeGenerator`         | generates a `TypeGenerator` for a wrapper type            | [Generated values](#generate-values-instead-of-asking-for-them)                     |
+| `@CsvImport`                  | generates a `CsvRowMapper`                                | [Import it from CSV](#import-it-from-csv)                                           |
+| `@CsvColumn`                  | reads a property from another CSV column                  | [Import it from CSV](#import-it-from-csv)                                           |
+| `@CsvIgnore`                  | leaves a property out of the CSV row                      | [Import it from CSV](#import-it-from-csv)                                           |

@@ -96,9 +96,9 @@ class PatchFieldTest {
     @Test
     fun `toTargetIdsOrNull on Value(null) or Value(emptyList) both return an empty set`() {
         assertThat(PatchField.Value<List<String>>(null).toTargetIdsOrNull())
-            .isEqualTo(emptySet<Any?>())
+            .isEqualTo(emptySet<String>())
         assertThat(PatchField.Value(emptyList<String>()).toTargetIdsOrNull())
-            .isEqualTo(emptySet<Any?>())
+            .isEqualTo(emptySet<String>())
     }
 
     @Test

@@ -40,7 +40,7 @@ annotation class BuildTypeConverter(
  * [source] is a `TypeGenerator` of the wrapped type that the generated bean injects, for example
  * `StandardUuidGenerator` for `value class GameId(val value: UUID)`. Like [BuildTypeConverter.target],
  * only the name of [source] is used. [key] is passed on as the key of the generated bean; when blank,
- * the key is derived from the annotated type as `"generate${Type}"`.
+ * the key is derived from the annotated type as `"generate{Type}"`.
  */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.CLASS)

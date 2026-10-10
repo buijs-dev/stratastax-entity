@@ -1,6 +1,9 @@
 pluginManagement {
     repositories {
         mavenLocal()
+        mavenCentral()
+        gradlePluginPortal()
+        maven("https://repo.repsy.io/mvn/buijs-dev/maven")
         maven("https://maven.pkg.github.com/buijs-dev/*") {
             credentials {
                 username =
@@ -14,22 +17,7 @@ pluginManagement {
                         .orElse(providers.environmentVariable("GITHUB_TOKEN"))
                         .orNull
             }
-
-            mavenContent {
-                releasesOnly()
-                includeGroupByRegex("dev\\.buijs.*")
-            }
         }
-
-        maven("https://repo.repsy.io/mvn/buijs-dev/maven") {
-            mavenContent {
-                snapshotsOnly()
-                includeGroupByRegex("dev\\.buijs.*")
-            }
-        }
-
-        mavenCentral()
-        gradlePluginPortal()
     }
 }
 

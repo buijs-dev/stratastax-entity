@@ -53,7 +53,7 @@ class SortFieldTest {
     @Test
     fun `Sort without fields throws`() {
         assertThatThrownBy { Sort(emptyList()) }
-            .isInstanceOf(IllegalStateException::class.java)
+            .isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("at least one field")
     }
 

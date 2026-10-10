@@ -19,14 +19,14 @@ package dev.buijs.stratastax.entity.core.api
 /**
  * An ordered, non-empty list of sort criteria.
  *
- * @throws IllegalStateException If [fields] is empty.
+ * @throws IllegalArgumentException If [fields] is empty.
  */
 data class Sort(
     val fields: List<SortField>,
 ) {
 
     init {
-        check(fields.isNotEmpty()) {
+        require(fields.isNotEmpty()) {
             "Sort must contain at least one field; results are always sorted."
         }
     }

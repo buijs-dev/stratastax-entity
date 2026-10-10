@@ -19,8 +19,7 @@ package dev.buijs.stratastax.entity.core.spi.annotations
 import dev.buijs.stratastax.entity.core.api.SortDirection
 
 /**
- * Marks a constructor property as filterable by the caller - the annotation equivalent of
- * `publicApi { filter() }`.
+ * Marks a constructor property as filterable by the caller.
  *
  * Mutually exclusive with [SearchFixedFilter].
  *
@@ -41,8 +40,9 @@ annotation class SearchFilter(
  * meaningfully be filtered or sorted by the caller. Not needed on a [PersistenceSoftDelete] field,
  * which already implies `SearchFixedFilter("null")`.
  *
- * @property value Parsed like an RSQL value token: `null`, `true`/`false`, a plain number, or else
- *   a literal string. Timestamp and list values cannot be expressed here.
+ * @property value Parsed by the field type: `null`, `true`/`false`, a number, an ISO-8601 UTC
+ *   date-time such as `2026-01-01T00:00:00Z` for a date or timestamp, a UUID, an enum constant, JSON,
+ *   or else a string. One value only: the filter is always `property == value`.
  */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.VALUE_PARAMETER)

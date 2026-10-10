@@ -92,14 +92,14 @@ fun <T> PatchField<T>.nullAs(replacement: T): PatchField<T> =
  * automatically. The receiver is declared with a nullable collection, so both `PatchField<List<X>>`
  * and `PatchField<List<X>?>` resolve to this function.
  */
-fun <T, R> PatchField<Collection<T>?>.toTargetIdsOrNull(transform: (T) -> R): Set<Any?>? =
+fun <T, R> PatchField<Collection<T>?>.toTargetIdsOrNull(transform: (T) -> R): Set<R>? =
     when (this) {
         PatchField.Unset -> null
         is PatchField.Value -> value?.map(transform)?.toSet() ?: emptySet()
     }
 
 /** Same as [toTargetIdsOrNull] for elements that already are raw ids. */
-fun <T> PatchField<Collection<T>?>.toTargetIdsOrNull(): Set<Any?>? = toTargetIdsOrNull { it }
+fun <T> PatchField<Collection<T>?>.toTargetIdsOrNull(): Set<T>? = toTargetIdsOrNull { it }
 
 /**
  * Returns the supplied collection, or `null` if the group must not be touched ([PatchField.Unset]).

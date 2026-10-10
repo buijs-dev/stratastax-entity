@@ -21,8 +21,8 @@ import kotlin.reflect.KClass
 /**
  * Marks a data class as a root entity.
  *
- * A class that is also the group type of [PersistenceJoinOne], [PersistenceJoinMany] or
- * [PersistenceJoinManyThrough], or that is a [DomainEntityProjection], is never a root.
+ * A class that is also the target-type of a [PersistenceJoinOne], [PersistenceJoinMany] or
+ * [PersistenceJoinManyThrough] relation, or that is a [DomainEntityProjection], is never a root.
  */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.CLASS)
@@ -44,9 +44,10 @@ annotation class DomainEntityProjection(
  * command, so `val status: ApprovalStatus = ApprovalStatus.Pending` makes `status` optional on
  * create.
  *
- * @property type The command property type when it can't be derived, such as the id type of a
+ * @property type The command property type when it can't be derived, such as the id-type of a
  *   relation target. Like [RestEntity], only the name is used. [Unit] means derived.
- * @property property The command property name when it must differ from the derived one.
+ * @property property The command property name when it must differ from the derived one. Not
+ *   supported on a [PersistenceJoinManyThrough] relation, which keeps its own name.
  */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.VALUE_PARAMETER)
@@ -76,7 +77,7 @@ annotation class DomainUpdate(
  * The value is produced by a [dev.buijs.stratastax.entity.core.spi.TypeGenerator]. A [key] is
  * required when multiple properties have the same type but need different generators, or to replace
  * a built-in generator for one property. When blank, the key is derived from the type as
- * `"generate${Type}"`. For example:
+ * `"generate{Type}"`. For example:
  * ```
  * @DomainCreateGenerated("ownerId")
  * val ownerId: Long

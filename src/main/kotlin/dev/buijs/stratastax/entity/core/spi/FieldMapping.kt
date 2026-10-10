@@ -31,5 +31,5 @@ interface FieldMapping<out F : Any> {
 
 /** Thrown when a [FieldMapping] has no field registered for the requested name. */
 class UnknownFieldException(
-    name: String,
-) : IllegalStateException("No mapping found for search field ($name)")
+    val name: String,
+) : IllegalArgumentException("No mapping found for search field ($name)")
