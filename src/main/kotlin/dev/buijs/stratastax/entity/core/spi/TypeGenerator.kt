@@ -19,10 +19,18 @@ package dev.buijs.stratastax.entity.core.spi
 /**
  * Generates a value for a field.
  *
- * The [key] is read from source by the gradle-plugin, never at runtime, so it must be a string
- * literal. When `null`, the key is derived from [T] as `"generate${T}"`.
+ * The generator is matched to a `@DomainCreateGenerated`/`@DomainUpdateGenerated` property by
+ * [key]. The [key] is read from source by the gradle-plugin, never at runtime, so it must be a
+ * string literal. When `null`, the key is derived from [T] as `"generate{T}"`, which is also what
+ * an annotation with a blank key resolves to.
+ *
+ * @param key The key of the annotations this generator serves, or `null` to serve every property of
+ *   type [T] that has no explicit key.
  */
-abstract class TypeGenerator<T>(private val key: String? = null) {
+abstract class TypeGenerator<T>(
+    key: String? = null,
+) {
+
     /** Returns a newly generated value. */
     abstract fun generate(): T
 }

@@ -23,10 +23,32 @@ class EntityFieldTest {
 
     @Test
     fun `an EntityField is neither sortable nor filterable and has no enum values by default`() {
+        // given
         val field = EntityField(name = "id", type = EntityFieldType.UUID)
 
+        // expect
         assertThat(field.sortable).isFalse()
         assertThat(field.filterable).isFalse()
         assertThat(field.enumValues).isEmpty()
+    }
+
+    @Test
+    fun `an EntityField keeps all supplied properties`() {
+        // given
+        val field =
+            EntityField(
+                name = "status",
+                type = EntityFieldType.ENUM,
+                sortable = true,
+                filterable = true,
+                enumValues = setOf("OPEN", "CLOSED"),
+            )
+
+        // expect
+        assertThat(field.name).isEqualTo("status")
+        assertThat(field.type).isEqualTo(EntityFieldType.ENUM)
+        assertThat(field.sortable).isTrue()
+        assertThat(field.filterable).isTrue()
+        assertThat(field.enumValues).containsExactlyInAnyOrder("OPEN", "CLOSED")
     }
 }

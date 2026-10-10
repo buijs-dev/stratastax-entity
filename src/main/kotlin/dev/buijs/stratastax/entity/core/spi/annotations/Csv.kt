@@ -16,33 +16,43 @@
  */
 package dev.buijs.stratastax.entity.core.spi.annotations
 
-import kotlin.reflect.KClass
-
 /**
- * Declares candidate REST DTO types for a [DomainEntity].
+ * Generates a `CsvRowMapper` for the annotated class, which reads one CSV row into it.
  *
- * Neither [read] nor [readAll] is used as a type: only their names are matched against the OpenAPI
- * spec loaded for a codegen run.
+ * On a [DomainEntity], the mapper reads its generated create command instead: every [DomainCreate]
+ * property that isn't [CsvIgnore]. On any other class, every constructor property that isn't
+ * [CsvIgnore].
  */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.CLASS)
-@Repeatable
-annotation class ApiEntity(val read: KClass<*> = Unit::class, val readAll: KClass<*> = Unit::class)
+annotation class CsvImport
 
 /**
- * Marks a property or parameter readable into the REST DTO.
+ * Reads this property from the CSV column [name] instead of the column named after the property.
  *
- * [property] names the DTO property when it differs from the domain name.
+ * Column names are matched ignoring case and underscores, so this is only needed when the header
+ * is a different name, such as an abbreviation:
+ * ```
+ * @CsvImport
+ * @DomainEntity
+ * data class BggRankingEntry(
+ *     @DomainCreate
+ *     @CsvColumn("id")
+ *     @PersistenceColumn("BGG_ID")
+ *     val bggId: Long,
+ * )
+ * ```
  */
 @Retention(AnnotationRetention.SOURCE)
-@Target(AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.PROPERTY)
-annotation class ApiRead(val property: String = "")
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class CsvColumn(
+    val name: String,
+)
 
 /**
- * Declares the REST DTO type to convert a property or parameter to; implies [ApiRead].
- *
- * Like [ApiEntity], only the name of [targetType] is used.
+ * Leaves this property out of the CSV row; on a [DomainEntity], it must have a default value, which
+ * the create command then uses.
  */
 @Retention(AnnotationRetention.SOURCE)
-@Target(AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.PROPERTY)
-annotation class ApiType(val targetType: KClass<*>)
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class CsvIgnore

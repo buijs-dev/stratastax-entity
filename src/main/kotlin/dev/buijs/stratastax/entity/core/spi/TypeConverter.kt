@@ -18,5 +18,6 @@ package dev.buijs.stratastax.entity.core.spi
 
 /** Converts a raw value of type [T] to type [R], passing `null` through the converter as well. */
 fun interface TypeConverter<T, R> {
+
     fun convert(raw: T?): R?
 }

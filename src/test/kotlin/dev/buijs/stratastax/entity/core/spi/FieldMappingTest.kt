@@ -28,6 +28,7 @@ class FieldMappingTest {
 
     private val mapping =
         object : FieldMapping<EntityField> {
+
             override val fields = mapOf("title" to title)
         }
 
@@ -43,7 +44,8 @@ class FieldMappingTest {
             catchThrowableOfType(UnknownFieldException::class.java) { mapping.field("missing") }
 
         // expect
-        assertThat(error).isInstanceOf(IllegalStateException::class.java)
+        assertThat(error).isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(error.name).isEqualTo("missing")
         assertThat(error.message).isEqualTo("No mapping found for search field (missing)")
     }
 }
